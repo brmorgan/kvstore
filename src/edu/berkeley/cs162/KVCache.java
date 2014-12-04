@@ -30,7 +30,23 @@
  */
 package edu.berkeley.cs162;
 
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Text;
 
 
 /**
@@ -41,6 +57,35 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 public class KVCache implements KeyValueInterface {
     private int numSets = 100;
     private int maxElemsPerSet = 10;
+    
+
+    ArrayList<LinkedList<Entry>> cache;
+    WriteLock[] locks;
+    
+    // Added 4 Dec 2014
+    
+    private class Entry
+    {
+    	public String key;
+    	public String value;
+    	public boolean isReferenced;
+    	public boolean isValid;
+    	
+    	public Entry(String key, String value)
+    	{
+	    	this.key = key;
+	    	this.value = value;
+	    	this.isValid = true;
+	    	this.isReferenced = true;
+	    }
+
+    	public String toString()
+    	{
+    		return "(" + key + ", " + value + ")";
+    	}
+    }
+    
+    //--
 
     /**
      * Creates a new LRU cache.
@@ -49,7 +94,20 @@ public class KVCache implements KeyValueInterface {
     public KVCache(int numSets, int maxElemsPerSet) {
         this.numSets = numSets;
         this.maxElemsPerSet = maxElemsPerSet;
-        // TODO: Implement Me!
+        
+        // Added 4 Dec 2014
+        
+        cache = new ArrayList<LinkedList<Entry>>(numSets);
+        locks = new WriteLock[numSets];
+        
+        for (int i = 0; i < numSets; i++)
+        {
+        	ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+        	locks[i] = lock.writeLock();
+        	cache.add(new LinkedList<Entry>());
+        }
+        
+        //--
     }
 
     /**
@@ -63,7 +121,26 @@ public class KVCache implements KeyValueInterface {
         AutoGrader.agCacheGetStarted(key);
         AutoGrader.agCacheGetDelay();
 
-        // TODO: Implement Me!
+        // Added 4 Dec 2014
+        
+        int set = getSetId(key);
+        LinkedList<Entry> tempCache = cache.get(set);
+        Entry result = null;
+        
+        for (Entry entry : tempCache)
+        {
+        	if (entry.key.equals(key))
+        	{
+        		result = entry;
+        		break;
+        	}
+        }
+        
+        if (result != null)
+        {
+        	result.isReferenced = true;
+        }
+        //--
 
         // Must be called before returning
         AutoGrader.agCacheGetFinished(key);
@@ -84,7 +161,44 @@ public class KVCache implements KeyValueInterface {
         AutoGrader.agCachePutStarted(key, value);
         AutoGrader.agCachePutDelay();
 
-        // TODO: Implement Me!
+        // Added 4 Dec 2014
+        int set = getSetId(key);
+        LinkedList<Entry> tempCache = cache.get(set);
+        Entry result = null;
+        
+        for (Entry entry : tempCache)
+        {
+	        if (entry.key.equals(key))
+	        {
+		        result = entry;
+		        break;
+	        }
+        }
+        
+        if (result != null)
+        {
+	        result.value = value;
+	        result.isReferenced = true;
+        }
+        else
+        {
+        	Entry newCacheEntry = new Entry(key, value);
+	        if (tempCache.size()==this.maxElemsPerSet)
+	        {
+		        while(true) 
+		        {
+			        Entry evict = tempCache.pop();
+			        if (evict.isReferenced)
+			        {
+				        evict.isReferenced = false;
+				        tempCache.addLast(evict);
+			        }
+			        else break;
+		        }
+	        }
+	        tempCache.addLast(newCacheEntry);
+        }
+        //--
 
         // Must be called before returning
         AutoGrader.agCachePutFinished(key, value);
@@ -100,7 +214,19 @@ public class KVCache implements KeyValueInterface {
         AutoGrader.agCacheDelStarted(key);
         AutoGrader.agCacheDelDelay();
 
-        // TODO: Implement Me!
+        // Added 4 Dec 2014
+        
+        LinkedList<Entry> tempCache = cache.get(getSetId(key));
+        for (Entry entry : tempCache) 
+        {
+        	if (entry.key.equals(key))
+        	{
+        		tempCache.remove(entry);
+        		break;
+        	}
+        }
+        
+        //--
 
         // Must be called before returning
         AutoGrader.agCacheDelFinished(key);
@@ -110,9 +236,10 @@ public class KVCache implements KeyValueInterface {
      * @param key
      * @return    the write lock of the set that contains key.
      */
-    public WriteLock getWriteLock(String key) {
-        // TODO: Implement Me!
-        return null;
+    public WriteLock getWriteLock(String key) 
+    {
+        // Added 4 Dec 2014
+    	return locks[getSetId(key)];
     }
 
     /**
@@ -124,8 +251,93 @@ public class KVCache implements KeyValueInterface {
         return Math.abs(key.hashCode()) % numSets;
     }
 
-    public String toXML() {
-        // TODO: Implement Me!
-        return null;
+    public String toXML() throws KVException
+    {
+        // Added 4 Dec 2014
+    	
+    	DocumentBuilder xmlBuilder;
+    	try 
+    	{
+    		xmlBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+    	} 
+    	catch (Exception e) 
+    	{
+    		throw new KVException (new KVMessage("Error: DocumentBuilder error"));
+    	}
+    	
+    	Document doc = xmlBuilder.newDocument();
+    	doc.setXmlStandalone(true);
+    	Element root = doc.createElement("KVCache");
+    	doc.appendChild(root);
+    	
+    	for (int i = 0; i < numSets; i++) 
+    	{
+	    	Element setElement = doc.createElement("Set");
+	    	setElement.setAttribute("Id", Integer.toString(this.getSetId(Integer.toString(i))));
+	    	root.appendChild(setElement);
+	    	LinkedList<Entry> entries = cache.get(i);
+	    	
+	    	for (Iterator<Entry> iterator = entries.iterator(); iterator.hasNext();) 
+	    	{
+		    	Entry entry = iterator.next();
+		    	Element cacheEntry = doc.createElement("CacheEntry");
+		    	cacheEntry.setAttribute("isReferenced", Boolean.toString(entry.isReferenced));
+		    	cacheEntry.setAttribute("isValid", Boolean.toString(entry.isValid));
+		    	setElement.appendChild(cacheEntry);
+		    	
+		    	Element key = doc.createElement("Key");
+		    	cacheEntry.appendChild(key);
+		    	
+		    	Text keyText = doc.createTextNode(entry.key);
+		    	key.appendChild(keyText);
+		    	
+		    	Element value = doc.createElement("Value");
+		    	cacheEntry.appendChild(value);
+		    	
+		    	Text valueText = doc.createTextNode(entry.value);
+		    	value.appendChild(valueText);
+	    	}
+	    	
+	    	int sizeOfEntries = entries.size();
+	    	
+	    	if (sizeOfEntries < maxElemsPerSet) 
+	    	{
+		    	for (int j = sizeOfEntries; j < maxElemsPerSet; j++) 
+		    	{
+			    	Element cacheEntry = doc.createElement("CacheEntry");
+			    	cacheEntry.setAttribute("isReferenced", Boolean.toString(false));
+			    	cacheEntry.setAttribute("isValid", Boolean.toString(false));
+			    	setElement.appendChild(cacheEntry);
+			    	
+			    	Element key = doc.createElement("Key");
+			    	cacheEntry.appendChild(key);
+			    	
+			    	Text keyText = doc.createTextNode("empty or garbage");
+			    	key.appendChild(keyText);
+			    	
+			    	Element valueElement = doc.createElement("Value");
+			    	cacheEntry.appendChild(valueElement);
+			    	
+			    	Text valueText = doc.createTextNode("empty or garbage");
+			    	valueElement.appendChild(valueText);
+		    	}
+	    	}
+    	} 
+    	try 
+    	{
+	    	Transformer tf = TransformerFactory.newInstance().newTransformer();
+	    	StreamResult result = new StreamResult(new StringWriter());
+	    	DOMSource source = new DOMSource(doc);
+	    	
+	    	tf.transform(source, result);
+	    	
+	    	return result.getWriter().toString();
+	    } 
+    	catch (Exception e) 
+    	{
+	    	throw new KVException(new KVMessage("Error: TransformerFactory error"));
+    	}
+    	
+    	//--
     }
 }
