@@ -128,7 +128,7 @@ public class KVClient implements KeyValueInterface
         	throw new KVException(new KVMessage("resp", "Error: Could not read input stream"));
         }
         
-        ret = new KVMessage(myIS.toString());
+        ret = new KVMessage(myIS);
         if(ret.getMessage().compareTo("Success") == 0)
         {
         	closeHost(socket);
@@ -165,7 +165,7 @@ public class KVClient implements KeyValueInterface
     		throw new KVException(new KVMessage("resp", "Error: Could not read input stream"));
     	}
     	
-    	ret = new KVMessage(myIS.toString());
+    	ret = new KVMessage(myIS);
     	value = ret.getValue();
     	if(value != null)
     	{
@@ -202,7 +202,7 @@ public class KVClient implements KeyValueInterface
     		throw new KVException(new KVMessage("resp", "Error: Could not read input stream"));
     	}
     	
-    	ret = new KVMessage(myIS.toString());
+    	ret = new KVMessage(myIS);
     	
     	if (ret.getMessage().compareTo("Success") == 0) 
     	{
