@@ -31,6 +31,7 @@
  */
 package edu.berkeley.cs162;
 
+import java.io.InputStream;
 import java.net.Socket;
 
 
@@ -41,8 +42,9 @@ import java.net.Socket;
  * @param <K> Java Generic type for the Key
  * @param <V> Java Generic type for the Value
  */
-public class KVClient implements KeyValueInterface {
-
+public class KVClient implements KeyValueInterface 
+{
+	
     private String server = null;
     private int port = 0;
 
@@ -55,25 +57,163 @@ public class KVClient implements KeyValueInterface {
         this.port = port;
     }
 
-    private Socket connectHost() throws KVException {
-        // TODO: Implement Me!
-        return null;
+    private Socket connectHost() throws KVException 
+    {
+    	// Added 4 Dec 2014
+    	
+        Socket socket = null;
+        try
+        {
+        	socket = new Socket(server, port);
+        }
+        catch(Exception e)
+        {
+        	throw new KVException(new KVMessage("resp", "Error: Could not create socket"));
+        }
+        
+        try
+        {
+        	socket.connect(socket.getRemoteSocketAddress());
+        }
+        catch(Exception e)
+        {
+        	throw new KVException(new KVMessage("resp", "Error: Could not connect to host"));
+        }
+        
+        return socket;
+        
+        //--
     }
 
-    private void closeHost(Socket sock) throws KVException {
-        // TODO: Implement Me!
+    private void closeHost(Socket sock) throws KVException 
+    {
+    	// Added 4 Dec 2014
+    	
+        try
+        {
+        	sock.close();
+        }
+        catch(Exception e)
+        {
+        	throw new KVException(new KVMessage("resp", "Error: Could not close socket"));
+        }
+        
+        //--
     }
 
-    public void put(String key, String value) throws KVException {
-        // TODO: Implement Me!
+    public void put(String key, String value) throws KVException 
+    {
+    	// Added 4 Dec 2014
+    	
+        if(key == null || value == null)
+        	throw new KVException(new KVMessage("resp", "Error: Null input"));
+        
+        Socket socket = connectHost();
+        
+        KVMessage req = null;
+        KVMessage ret = null;
+        InputStream myIS = null;
+        
+        req = new KVMessage("putreq");
+        req.setKey(key);
+        req.setValue(value);
+        req.sendMessage(socket);
+        
+        try
+        {
+        	myIS = socket.getInputStream();
+        }
+        catch(Exception e)
+        {
+        	throw new KVException(new KVMessage("resp", "Error: Could not read input stream"));
+        }
+        
+        ret = new KVMessage(myIS.toString());
+        if(ret.getMessage().compareTo("Success") == 0)
+        {
+        	closeHost(socket);
+        
+        }
+        else
+        {
+        	throw new KVException(ret);
+        }
+        
+        //--
     }
 
     public String get(String key) throws KVException {
-        // TODO: Implement Me!
-        return null;
+        // Added 4 Dec 2014
+    	
+    	Socket socket = connectHost();
+    	
+    	String value = null;
+    	KVMessage req = null;
+    	KVMessage ret = null;
+    	InputStream myIS = null;
+    	
+    	req = new KVMessage("getreq");
+    	req.setKey(key);
+    	req.sendMessage(socket);
+    	
+    	try 
+    	{
+    		myIS = socket.getInputStream();
+    	}
+    	catch (Exception e) 
+    	{
+    		throw new KVException(new KVMessage("resp", "Error: Could not read input stream"));
+    	}
+    	
+    	ret = new KVMessage(myIS.toString());
+    	value = ret.getValue();
+    	if(value != null)
+    	{
+    		closeHost(socket);
+    		return value;
+    	}
+    	else
+    	{
+    		throw new KVException(ret);
+    	}
+    	
+    	// --
     }
 
-    public void del(String key) throws KVException {
-        // TODO: Implement Me!
+    public void del(String key) throws KVException 
+    {
+        // Added 4 Dec 2014
+    	
+    	Socket socket = connectHost();
+    	KVMessage req = null;
+    	KVMessage ret = null;
+    	InputStream myIS = null;
+    	
+    	req = new KVMessage("delreq");
+    	req.setKey(key);
+    	req.sendMessage(socket);
+    	
+    	try 
+    	{
+    		myIS = socket.getInputStream();
+    	}
+    	catch (Exception e) 
+    	{
+    		throw new KVException(new KVMessage("resp", "Error: Could not read input stream"));
+    	}
+    	
+    	ret = new KVMessage(myIS.toString());
+    	
+    	if (ret.getMessage().compareTo("Success") == 0) 
+    	{
+    		closeHost(socket);
+    		return;
+    	}
+    	else
+    	{
+    		throw new KVException(ret);
+    	}
+    	
+    	// --
     }
 }
