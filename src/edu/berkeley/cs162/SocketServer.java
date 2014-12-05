@@ -31,6 +31,7 @@
 package edu.berkeley.cs162;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 
 /**
@@ -43,17 +44,30 @@ public class SocketServer {
     int port;
     NetworkHandler handler;
     ServerSocket server;
+    boolean open;
 
     public SocketServer(String hostname, int port) {
         this.hostname = hostname;
         this.port = port;
+        open = false;
     }
 
     /**
      * Creates a new ServerSocket and binds it to an endpoint.
      */
-    public void connect() throws IOException {
-        // TODO: implement me
+    public void connect() throws IOException 
+    {
+        // Added 4 Dec 2014
+    	
+    	if(open) 
+    		return;
+    	
+    	server = new ServerSocket();
+    	server.bind(new InetSocketAddress(hostname, port));
+    	
+    	open = true;
+    	
+    	//--
     }
 
     /**
@@ -61,31 +75,61 @@ public class SocketServer {
      * @throws IOException if there is a network error (for instance if the
     *          socket is inadvertently closed)
      */
-    public void run() throws IOException {
-        // TODO: implement me
+    public void run() throws IOException 
+    {
+        // Added 4 Dec 2014
+    	if (!open) 
+    	{
+    		throw new IOException();
+    	}
+    	
+    	while (open) 
+    	{
+    		handler.handle(server.accept());
+    	}
+    	//--
     }
 
     /**
      * Add the network handler for the current socket server
      * @param handler is logic for servicing a network connection
      */
-    public void addHandler(NetworkHandler handler) {
+    public void addHandler(NetworkHandler handler) 
+    {
         this.handler = handler;
     }
 
     /**
      * Close the ServerSocket immediately.
      */
-    public void closeSocket() {
-        // TODO: implement me
+    public void closeSocket() 
+    {
+        // Added 4 Dec 2014
+    	
+    	try 
+    	{
+    		server.close();
+    	} 
+    	catch (IOException e) 
+    	{
+    		return;
+    	}
+    	
+    	//--
     }
 
     /**
      * Stop the ServerSocket cleanly (do not force an exception to be thrown).
      * A call to stop() may return before the ServerSocket is closed.
      */
-    public void stop() {
-        // TODO: implement me
+    public void stop() 
+    {
+        // Added 4 Dec 2014
+    	
+    	open = false;
+    	closeSocket();
+    	
+    	//--
     }
 
     protected void finalize(){

@@ -30,11 +30,14 @@
  */
 package edu.berkeley.cs162;
 
+import java.util.LinkedList;
+
 public class ThreadPool {
     /**
      * Set of threads in the threadpool
      */
     protected Thread threads[] = null;
+    LinkedList<Runnable> jobs;
 
     /**
      * Initialize the number of threads required in the threadpool.
@@ -43,7 +46,18 @@ public class ThreadPool {
      */
     public ThreadPool(int size)
     {
-        // TODO: implement me
+        // Added 4 Dec 2014
+    	
+    	threads = new Thread[size];
+    	jobs = new LinkedList<Runnable>();
+    	
+    	for (int i = 0; i < size; i++)
+    	{
+    		threads[i] = new WorkerThread(this);
+    		threads[i].start();
+    	}
+    	
+    	//--
     }
 
     /**
@@ -54,7 +68,12 @@ public class ThreadPool {
      */
     public void addToQueue(Runnable r) throws InterruptedException
     {
-        // TODO: implement me
+        // Added 4 Dec 2014
+    	
+    	jobs.push(r);
+    	notify();
+    	
+    	//--
     }
     
     /**
@@ -62,16 +81,28 @@ public class ThreadPool {
      * @return A runnable task that has to be executed
      * @throws InterruptedException
      */
-    public synchronized Runnable getJob() throws InterruptedException {
-        // TODO: implement me
-        return null;
+    public synchronized Runnable getJob() throws InterruptedException 
+    {
+        // Added 4 Dec 2014
+    	
+    	if (jobs.size() == 0) 
+    	{
+    		this.wait();
+    	}
+    		
+    	return jobs.pop();
+    	
+    	//--
     }
 }
 
 /**
  * The worker threads that make up the thread pool.
  */
-class WorkerThread extends Thread {
+class WorkerThread extends Thread 
+{
+	ThreadPool owner;
+	
     /**
      * The constructor.
      *
@@ -79,7 +110,11 @@ class WorkerThread extends Thread {
      */
     WorkerThread(ThreadPool o)
     {
-        // TODO: implement me
+        // Added 4 Dec 2014
+    	
+    	owner = o;
+    	
+    	//
     }
 
     /**
@@ -87,6 +122,16 @@ class WorkerThread extends Thread {
      */
     public void run()
     {
-        // TODO: implement me
+    	while(true)
+    	{
+    		try
+    		{
+    			owner.getJob().run();
+    		}
+    		catch(InterruptedException e)
+    		{
+    			return;
+    		}
+    	}
     }
 }
