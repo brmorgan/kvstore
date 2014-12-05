@@ -139,6 +139,9 @@ public class KVCache implements KeyValueInterface {
         if (result != null)
         {
         	result.isReferenced = true;
+        	
+        	AutoGrader.agCacheGetFinished(key);
+            return result.value;
         }
         //--
 
